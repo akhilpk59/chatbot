@@ -3,105 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chatbot</title>
+    <title>AI Chatbot</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #f4f4f4;
+            text-align: center;
         }
-        .chat-container {
-            width: 400px;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        .chatbox {
-            height: 300px;
+        #chat-container {
+            width: 50%;
+            margin: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            height: 400px;
             overflow-y: auto;
-            border-bottom: 1px solid #ccc;
-            padding-bottom: 10px;
-            margin-bottom: 10px;
         }
-        .input-container {
-            display: flex;
-        }
-        input {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ccc;
+        .message {
+            padding: 5px;
+            margin: 5px;
             border-radius: 5px;
         }
-        button {
-            padding: 10px;
-            border: none;
-            background-color: #007bff;
-            color: white;
-            border-radius: 5px;
+        .user-message {
+            background-color: #d1e7ff;
+            text-align: left;
+        }
+        .bot-message {
+            background-color: #d4edda;
+            text-align: left;
+        }
+        #user-input {
+            width: 80%;
+            padding: 8px;
+        }
+        #send-btn {
+            padding: 8px;
             cursor: pointer;
-        }
-        button:hover {
-            background-color: #0056b3;
         }
     </style>
 </head>
 <body>
+    <h2>AI Chatbot</h2>
 
-    <div class="chat-container">
-        <h2>Chatbot</h2>
-        <div id="chatbox" class="chatbox"></div>
-        <div class="input-container">
-            <input type="text" id="userInput" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
-            <button onclick="sendMessage()">Send</button>
-        </div>
-    </div>
+    <button id="start-chat-btn">Start Chat</button>
+    <button id="stop-chat-btn" disabled>Stop Chat</button>
+
+    <div id="chat-container"></div>
+
+    <input type="text" id="user-input" placeholder="Type your message..." disabled>
+    <button id="send-btn" disabled>Send</button>
 
     <script>
-        const CHATBOT_URL = "https://chatbot-651998033309.asia-south1.run.app/chat";  // ✅ Your Cloud Run chatbot URL
+        let chatbotUrl = "https://chatbot-backend-u2hfsb6yrq-el.a.run.app";  // Replace with actual backend URL
+        let chatActive = false;
 
-        async function sendMessage() {
-            const userInput = document.getElementById("userInput").value.trim();
-            if (!userInput) return;
+        document.getElementById("start-chat-btn").addEventListener("click", function() {
+            fetch(`${chatbotUrl}/start`, { method: "POST" })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message === "Chatbot started") {
+                        chatActive = true;
+                        document.getElementById("start-chat-btn").disabled = true;
+                        document.getElementById("stop-chat-btn").disabled = false;
+                        document.getElementById("user-input").disabled = false;
+                        document.getElementById("send-btn").disabled = false;
+                        addMessage("Chatbot started!", "bot-message");
+                    }
+                })
+                .catch(error => console.error("Error:", error));
+        });
 
-            // Display user message
-            const chatbox = document.getElementById("chatbox");
-            chatbox.innerHTML += `<p><b>You:</b> ${userInput}</p>`;
+        document.getElementById("send-btn").addEventListener("click", function() {
+            let userInput = document.getElementById("user-input").value;
+            if (userInput.trim() === "" || !chatActive) return;
 
-            try {
-                const response = await fetch(CHATBOT_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: userInput })
-                });
+            addMessage(`You: ${userInput}`, "user-message");
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
+            fetch(`${chatbotUrl}/chat`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: userInput })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Chatbot Response:", data);
+                if (data.response) {
+                    addMessage(`Bot: ${data.response}`, "bot-message");
+                } else {
+                   addMessage(`Bot: Error - Unexpected Response Format: ${JSON.stringify(data)}`, "bot-message");
                 }
+            })
+            .catch(error =>{
+        console.error("Error:", error);
+        addMessage("Error: Failed to fetch response", "bot-message");
+    });
 
-                const data = await response.json();
+            document.getElementById("user-input").value = "";
+        });
 
-                // Display chatbot response
-                chatbox.innerHTML += `<p><b>Bot:</b> ${data.response}</p>`;
-                chatbox.scrollTop = chatbox.scrollHeight;
-            } catch (error) {
-                chatbox.innerHTML += `<p style="color:red;"><b>Error:</b> Unable to connect to chatbot.</p>`;
-                console.error("Chatbot connection error:", error);
-            }
+        document.getElementById("stop-chat-btn").addEventListener("click", function() {
+            fetch(`${chatbotUrl}/stop`, { method: "POST" })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message === "Chatbot stopped") {
+                        chatActive = false;
+                        document.getElementById("start-chat-btn").disabled = false;
+                        document.getElementById("stop-chat-btn").disabled = true;
+                        document.getElementById("user-input").disabled = true;
+                        document.getElementById("send-btn").disabled = true;
+                        addMessage("Chatbot stopped!", "bot-message");
+                    }
+                })
+                .catch(error => console.error("Error:", error));
+        });
 
-            // Clear input
-            document.getElementById("userInput").value = "";
-        }
-
-        function handleKeyPress(event) {
-            if (event.key === "Enter") {
-                sendMessage();
-            }
+        function addMessage(text, className) {
+            let messageDiv = document.createElement("div");
+            messageDiv.className = `message ${className}`;
+            messageDiv.innerText = text;
+            document.getElementById("chat-container").appendChild(messageDiv);
         }
     </script>
-
 </body>
 </html>
